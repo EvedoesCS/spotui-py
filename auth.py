@@ -8,14 +8,13 @@ import webbrowser
 import urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import os
-from datetime import datetime, timedelta
 import requests
 import json
+from util import read_config
 
 
 path = []
 class CallbackServer(BaseHTTPRequestHandler):
-
     def do_GET(self):
         self.send_response(200)
         self.send_header('Content-Type', 'text/html')
@@ -23,24 +22,6 @@ class CallbackServer(BaseHTTPRequestHandler):
 
         self.wfile.write(bytes("<html><body><h1>You may now close this page :)</h1></body></html>", "utf-8"))
         path.append(self.path.split('='))
-
-
-def read_config():
-    """
-    Reads client_id and client_secret from the config file
-    """
-    try:
-        file = open("config", 'r')
-    except:
-        print("Error config file is missing")
-
-    lines = file.readlines()
-    config = {}
-    for line in lines:
-        line = line.strip().split('=')
-        config[line[0]] = line[1]
-
-    return config
 
 
 HOST = '127.0.0.1'
@@ -122,6 +103,5 @@ def authenticate():
     while token == None:
         set_token(get_access_code())
         token = os.environ['spotui_token']
-
 
     return token

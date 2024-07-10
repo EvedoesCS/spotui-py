@@ -26,3 +26,37 @@ def format_to_QI(raw_data: dict) -> list:
         data.append(QueryItem(item['id'], item['name'], item['artists'][0], item['album'], item['duration_ms']))
 
     return data
+
+
+def read_config():
+    """
+    Reads client_id and client_secret from the config file
+    """
+    try:
+        file = open("config", 'r')
+    except:
+        print("Error config file is missing")
+
+    lines = file.readlines()
+    config = {}
+    for line in lines:
+        line = line.strip().split('=')
+        config[line[0]] = line[1]
+
+    return config
+
+
+def format_to_min_sec(num: int) -> str:
+    # Converts a number of seconds into a string of min:sec
+    min = str(num // 60)
+    sec = str(num % 60)
+    if len(sec) < 2:
+        sec = '0' + sec
+    return f'{min}:{sec}'
+
+
+def round_up(num: int) -> int:
+    if num - int(num) != 0:
+        return int(num) + 1
+    else:
+        return num

@@ -5,6 +5,9 @@
 
 import curses
 from curses import wrapper
+import threading
+import time
+
 import auth
 import routes
 import ui
@@ -19,49 +22,101 @@ class App:
         content_window = ui.ContentWin()
         links_window = ui.LinksWin()
         timeline_bar = ui.TimelineWin()
+        self.exiting = False
         self.components = {
                 'search_bar': search_bar,
                 'content_window': content_window,
                 'links_window': links_window,
                 'timeline_bar': timeline_bar
                 }
+        self.p_state = routes.get_playback_state(self.token)
 
-    def handle_msg(self, msg):
-        if msg[0] == 'search':
-            query = self.components['search_bar'].get_query()
-            if query != 'exit' or query != '':
-                self.handle_msg(('query', query))
-            else:
-                return ''
+    def refresh_p_state(self):
+        while True:
+            time.sleep(0.5)
+            if self.exiting is True:
+                break
+            self.p_state = routes.get_playback_state(self.token)
+            if self.p_state == 204:
+                routes.transfer_playback(self.token)
+                self.p_state = routes.get_playback_state(self.token)
+            if type(self.p_state) is not int:
+                self.components['timeline_bar'].update_vars(
+                                            self.p_state['item'],
+                                            self.p_state['is_playing'],
+                                            self.p_state['device']['volume_percent'],
+                                            self.p_state['progress_ms'] // 1000)
+            curses.curs_set(0)
 
-        elif msg[0] == 'query':
-            query_data = routes.search(self.token, msg[1])
-            fquery_data = util.format_to_QI(query_data)
-            self.components['content_window'].data = fquery_data
-            self.handle_msg(('update_content', None))
-
-        elif msg[0] == 'update_content':
+    def search(self):
+        r = self.components['search_bar'].get_query()
+        code, query = r.split('=')
+        if code == 'query':
+            raw_data = routes.search(self.token, query)
+            data = util.format_to_QI(raw_data)
+            self.components['content_window'].data = data
             self.components['content_window'].render_data()
-            self.handle_msg(('traverse_content', None))
+            return code
+        elif code == 'exit':
+            return code
 
-        elif msg[0] == 'traverse_content':
-            selected = self.components['content_window'].traverse()
-            if selected[0] == 'play':
-                self.handle_msg(('play', selected[1]))
-            else:
-                return ''
+    def play(self):
+        track_id = self.components['timeline_bar'].now_playing.id
+        routes.play(self.token, track_id)
 
-        elif msg[0] == 'play':
-            self.components['timeline_bar'].is_playing = True
-            self.components['timeline_bar'].now_playing = msg[1]
-            routes.play(self.token, msg[1])
+    def pause(self):
+        routes.pause(self.token)
 
-        elif msg[0] == 'pause':
-            self.components['timeline_bar'].is_playing = False
-            routes.pause(self.token)
+    def resume(self):
+        track_id = self.p_state['item']['id']
+        position = self.p_state['progress_ms']
+        routes.play(self.token, track_id, position_ms=position)
 
-        elif msg[0] == 'resume':
-            pass
+    def skip_to_previous(self):
+        routes.back(self.token)
+
+    def skip_to_next(self):
+        routes.next(self.token)
+
+    def handle_keys(self):
+        while True:
+            key = self.win.getch()
+            # Defines keybinds
+            if chr(key) == 'q':
+                self.exiting = True
+                break
+
+            elif chr(key) == 's':
+                c = self.search()
+                if c == 'query':
+                    r = self.components['content_window'].traverse()
+                    if r is not None:
+                        self.components['timeline_bar'].now_playing = r
+                        self.play()
+
+            elif chr(key) == 'c':
+                r = self.components['content_window'].traverse()
+                if r is not None:
+                    self.components['timeline_bar'].now_playing = r
+                    self.play()
+
+            elif chr(key) == 'p':
+                try:
+                    is_playing = self.p_state['is_playing']
+                except TypeError:
+                    routes.transfer_playback(self.token)
+                    is_playing = self.p_state['is_playing']
+
+                if is_playing is False:
+                    self.resume()
+                elif is_playing is True:
+                    self.pause()
+
+            elif chr(key) == 'b':
+                self.skip_to_previous()
+
+            elif chr(key) == 'n':
+                self.skip_to_next()
 
     def render_model(self):
         for component in self.components:
@@ -69,26 +124,14 @@ class App:
 
         self.win.refresh()
 
-        while True:
-            self.win.refresh()
-            key = self.win.getch()
+        t1 = threading.Thread(target=self.handle_keys)
+        t2 = threading.Thread(target=self.refresh_p_state)
 
-            # Defines keybinds
-            if chr(key) == 'q':
-                break
+        t1.start()
+        t2.start()
 
-            elif chr(key) == 's':
-                self.handle_msg(('search', None))
-
-            elif chr(key) == 'c':
-                self.handle_msg(('traverse_content', None))
-
-            elif chr(key) == 'p':
-                if self.components['timeline_bar'].is_playing == False:
-                    self.handle_msg(('play', self.components['timeline_bar'].now_playing))
-                elif self.components['timeline_bar'].is_playing == True:
-                    self.handle_msg(('pause'))
-                
+        t1.join()
+        t2.join()
 
 
 def main(win):
