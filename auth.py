@@ -12,8 +12,11 @@ import requests
 import json
 from util import read_config
 
+import routes
 
 path = []
+
+
 class CallbackServer(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -33,6 +36,24 @@ redirect_uri = 'http://localhost:8080'
 scope = 'user-read-private user-read-email user-modify-playback-state user-read-playback-state'
 url = 'https://accounts.spotify.com/authorize'
 code_verifier, code_challenge = pkce.generate_pkce_pair(43)
+
+
+def store_token(token: str):
+    file = open('data.txt', 'w')
+    file.write(token)
+    file.close()
+
+
+def read_token():
+    try:
+        file = open('data.txt', 'r')
+    except FileNotFoundError:
+        file = open('data.txt', 'x')
+        set_token(get_access_code())
+
+    token = file.read()
+    file.close()
+    return token
 
 
 def get_access_code():
@@ -75,7 +96,7 @@ def set_token(code):
 
     r = requests.post('https://accounts.spotify.com/api/token', data=data, headers=headers)
     token = json.loads(r.content)['access_token']
-    os.environ['spotui_token'] = token
+    store_token(token)
 
 
 def refresh_token(access_token):
@@ -92,16 +113,14 @@ def refresh_token(access_token):
 
     r = requests.post('https://accounts.spotify.com/api/token', data=data, headers=headers)
     token = json.loads(r.content)['access_token']
-    os.environ['spotui_token'] = token
+    store_token(token)
 
 
 def authenticate():
-    try:
-        token = os.environ['spotui_token']
-    except KeyError:
-        token = None
-    while token == None:
-        set_token(get_access_code())
-        token = os.environ['spotui_token']
+    token = read_token()
+    r = routes.get_users_profile(token)
+    if r == 401:
+        refresh_token(token)
+    token = read_token()
 
     return token

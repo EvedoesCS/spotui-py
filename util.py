@@ -2,30 +2,69 @@
 # Utility functions for spotui-py
 # -------------------------------- #
 
+class Queue():
+    def __init__(self):
+        self.items = []
 
-class QueryItem:
-    def __init__(self, id, name, artists, album, duration_ms):
+    def isempty(self):
+        return not self.items
+
+    def enqueue(self, item):
+        self.items.insert(0, item)
+
+    def dequeue(self):
+        return self.items.pop()
+
+    def peek(self):
+        return self.items[0]
+
+
+class Message():
+    def __init__(self, header, body):
+        self.header = header
+        self.body = body
+
+
+class Track():
+    def __init__(self, album, artists, disc_number, duration_ms, id, name, track_number):
+        self.album = album
+        self.artists = artists
+        self.disc_number = disc_number
+        self.duration_ms = duration_ms
         self.id = id
         self.name = name
-        self.artists = artists
-        self.album = album
-        self.duration_ms = int(duration_ms) / 60000
-
-    def __repr__(self):
-        print("id, name, artists, album, duration_ms")
+        self.track_number = track_number
+        self.type = 'track'
 
     def __str__(self):
-        return f"{self.name:<} by {self.artists['name']}"
+        return f'{self.name} by {self.artists}'
 
 
-def format_to_QI(raw_data: dict) -> list:
-    # Converts a dict of json data into a list of QueryItem objects
-    data = []
+class Artist():
+    def __init__(self, id, name, popularity, followers, genres):
+        self.id = id
+        self.name = name
+        self.popularity = popularity
+        self.followers = followers
+        self.genres = genres
+        self.type = 'artist'
 
-    for item in raw_data['tracks']['items']:
-        data.append(QueryItem(item['id'], item['name'], item['artists'][0], item['album'], item['duration_ms']))
+    def __str__(self):
+        return self.name
 
-    return data
+
+class Album():
+    def __init__(self, album_type, artists, id, name, release_date, total_tracks):
+        self.album_type = album_type
+        self.artists = artists
+        self.id = id
+        self.name = name
+        self.release_date = release_date
+        self.total_tracks = total_tracks
+        self.type = 'album'
+
+    def __str__(self):
+        return f'{self.name} by {self.artists} {self.release_date}'
 
 
 def read_config():
@@ -44,6 +83,78 @@ def read_config():
         config[line[0]] = line[1]
 
     return config
+
+
+def format_as_search_result(raw_data: dict) -> list:
+    data = []
+
+    for track in raw_data['tracks']['items']:
+        data.append(Track(track['album']['name'],
+                          track['artists'][0]['name'],
+                          track['disc_number'],
+                          track['duration_ms'],
+                          track['id'],
+                          track['name'],
+                          track['track_number']))
+
+    for artist in raw_data['artists']['items']:
+        data.append(Artist(artist['id'],
+                           artist['name'],
+                           artist['popularity'],
+                           artist['followers']['total'],
+                           artist['genres']))
+
+    for album in raw_data['albums']['items']:
+        data.append(Album(album['album_type'],
+                          album['artists'][0]['name'],
+                          album['id'],
+                          album['name'],
+                          album['release_date'],
+                          album['total_tracks']))
+
+    return data
+
+
+def format_artist(artist: dict, tracks: list, albums: dict) -> list:
+    data = []
+
+    data.append({'name': artist['name'], 'followers': artist['followers']['total']})
+
+    for track in tracks['tracks']:
+        data.append(Track(track['album']['name'],
+                          track['artists'][0]['name'],
+                          track['disc_number'],
+                          track['duration_ms'],
+                          track['id'],
+                          track['name'],
+                          track['track_number']))
+
+    for album in albums['items']:
+        data.append(Album(album['album_type'],
+                          album['artists'][0]['name'],
+                          album['id'],
+                          album['name'],
+                          album['release_date'],
+                          album['total_tracks']))
+
+    return data
+
+
+def format_album(album: dict, tracks: list) -> list:
+    data = []
+
+    data.append({'name': album['name'], 'release_date': album['release_date'], 'id': album['id']})
+
+    for track in tracks['items']:
+        data.append(Track(album['name'],
+                          track['artists'][0]['name'],
+                          track['disc_number'],
+                          track['duration_ms'],
+                          track['id'],
+                          track['name'],
+                          track['track_number']))
+
+    return data
 
 
 def format_to_min_sec(num: int) -> str:
