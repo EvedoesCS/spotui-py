@@ -24,7 +24,7 @@ class App():
         self.history = [{
                 'search_bar': ui.SearchBarWin(),
                 'content_window': ui.ContentWin(),
-                'links_window': ui.LinksWin(),
+                'library_window': ui.LibraryWin(),
                 'timeline_bar': ui.TimelineWin()
                 }]
         self.history_index = 0
@@ -70,6 +70,8 @@ class App():
                 return Message('pause', None)
             else:
                 return Message('resume', None)
+        elif chr(key) == 'u':
+            return Message('traverse', self.history[self.history_index]['library_window'])
 
         return Message('err', None)
 
@@ -89,7 +91,7 @@ class App():
 
     def find_traversable(self):
         for component in self.history[self.history_index]:
-            if component in ['search_window', 'artist_window', 'album_window']:
+            if component in ['search_window', 'artist_window', 'album_window', 'playlist_window']:
                 window_obj = self.history[self.history_index][component]
 
         return window_obj
@@ -107,8 +109,14 @@ class App():
         elif r.header == 'album':
             self.message_queue.enqueue(Message('load_album', r.body))
             return Message('ok', None)
+        elif r.header == 'playlist':
+            self.message_queue.enqueue(Message('load_playlist', r.body))
+            return Message('ok', None)
         elif r.header == 'play_album':
             self.message_queue.enqueue(Message('play_album', r.body))
+            return Message('ok', None)
+        elif r.header == 'play_playlist':
+            self.message_queue.enqueue(Message('play_playlist', r.body))
             return Message('ok', None)
         elif r.header == 'next_page':
             self.message_queue.enqueue(Message('load_next_history', None))
@@ -128,6 +136,13 @@ class App():
 
     def play_album(self, data):
         r = routes.play_album(self.token, data['id'], data['offset'])
+        if r == 200:
+            return Message('ok', r)
+        else:
+            return Message('err', r)
+
+    def play_playlist(self, data):
+        r = routes.play_playlist(self.token, data['id'], data['offset'])
         if r == 200:
             return Message('ok', r)
         else:
@@ -153,6 +168,16 @@ class App():
                                                     self.playback_state['device']['volume_percent'],
                                                     self.playback_state['progress_ms'] // 1000)
 
+    def load_library(self):
+        user = routes.get_users_profile(self.token)
+        playlists = routes.get_users_saved_playlists(self.token)
+        albums = routes.get_users_saved_albums(self.token)
+        artists = routes.get_users_saved_artists(self.token)
+        tracks = routes.get_users_saved_tracks(self.token)
+
+        data = util.format_users_library(user, playlists, albums, artists, tracks)
+        self.history[self.history_index]['library_window'].data = data
+
     def load_artist(self, id):
         tracks = routes.get_artists_top_tracks(self.token, id)
         albums = routes.get_artists_albums(self.token, id)
@@ -167,6 +192,13 @@ class App():
         data = util.format_album(album, tracks)
 
         return Message('album_window', data)
+
+    def load_playlist(self, id):
+        tracks = routes.get_playlist_tracks(self.token, id)
+        playlist = routes.get_playlist(self.token, id)
+        data = util.format_playlist(playlist, tracks)
+
+        return Message('playlist_window', data)
 
     # Main Methods
 
@@ -217,11 +249,18 @@ class App():
         elif message.header == 'play_album':
             r = self.play_album(message.body)
             return r
+        elif message.header == 'play_playlist':
+            r = self.play_playlist(message.body)
+            return r
 
         # UI Related Messages
         elif message.header == 'update_timeline':
             self.update_timeline()
             return Message('updated_timeline', self.history[self.history_index]['timeline_bar'])
+
+        elif message.header == 'load_library':
+            self.load_library()
+            return Message('updated_library', self.history[self.history_index]['library_window'])
 
         elif message.header == 'load_artist':
             r = self.load_artist(message.body)
@@ -229,6 +268,10 @@ class App():
 
         elif message.header == 'load_album':
             r = self.load_album(message.body)
+            return r
+
+        elif message.header == 'load_playlist':
+            r = self.load_playlist(message.body)
             return r
 
     def add_to_history(self, components):
@@ -243,7 +286,7 @@ class App():
             components = {
                     'search_bar': ui.SearchBarWin(),
                     'search_window': ui.SearchWindow(),
-                    'links_window': ui.LinksWin(),
+                    'library_window': self.history[self.history_index]['library_window'],
                     'timeline_bar': ui.TimelineWin()
                     }
             self.add_to_history(components)
@@ -256,11 +299,14 @@ class App():
         elif data.header == 'updated_timeline':
             return Message('update', data.body)
 
+        elif data.header == 'updated_library':
+            return Message('update', data.body)
+
         elif data.header == 'artist_window':
             components = {
                     'search_bar': ui.SearchBarWin(),
                     'artist_window': ui.ArtistWin(),
-                    'links_window': ui.LinksWin(),
+                    'library_window': self.history[self.history_index]['library_window'],
                     'timeline_bar': ui.TimelineWin()
                     }
             self.add_to_history(components)
@@ -273,7 +319,7 @@ class App():
             components = {
                     'search_bar': ui.SearchBarWin(),
                     'album_window': ui.AlbumWin(),
-                    'links_window': ui.LinksWin(),
+                    'library_window': self.history[self.history_index]['library_window'],
                     'timeline_bar': ui.TimelineWin()
                     }
             self.add_to_history(components)
@@ -281,6 +327,19 @@ class App():
             self.message_queue.enqueue(Message('traverse', self.find_traversable()))
 
             return Message('album_updated', None)
+
+        elif data.header == 'playlist_window':
+            components = {
+                    'search_bar': ui.SearchBarWin(),
+                    'playlist_window': ui.PlaylistWin(),
+                    'library_window': self.history[self.history_index]['library_window'],
+                    'timeline_bar': ui.TimelineWin()
+                    }
+            self.add_to_history(components)
+            self.history[self.history_index]['playlist_window'].data = data.body
+            self.message_queue.enqueue(Message('traverse', self.find_traversable()))
+
+            return Message('playlist_updated', None)
 
         else:
             return Message('full_refresh', None)
@@ -296,6 +355,7 @@ class App():
 
     def message_dispatcher(self):
         message = Message(None, None)
+        self.message_queue.enqueue(Message('load_library', None))
         while message.header != 'exit':
             if not self.message_queue.isempty():
                 message = self.message_queue.dequeue()
@@ -308,6 +368,7 @@ class App():
                     self.render_model(self.history[self.history_index])
 
     def run(self):
+        self.load_library()
         self.render_model(self.history[self.history_index])
         t1 = threading.Thread(target=self.event_handler)
         t2 = threading.Thread(target=self.message_dispatcher)

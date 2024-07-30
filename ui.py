@@ -115,6 +115,8 @@ class SearchWindow():
                     return Message('artist', self.data[highlight].id)
                 elif type == 'album':
                     return Message('album', self.data[highlight].id)
+                elif type == 'playlist':
+                    return Message('playlist', self.data[highlight].id)
             elif key == 27:
                 # Handle 'ESC'
                 self.win.erase()
@@ -269,15 +271,133 @@ class AlbumWin():
                 return Message('prev_page', None)
 
 
-class LinksWin():
+class PlaylistWin():
     def __init__(self):
-        self.win = curses.newwin((curses.LINES - 4), (curses.COLS // 4), 0, 0)
+        self.win = curses.newwin((curses.LINES - 7), (curses.COLS - (curses.COLS // 4)), 3, (curses.COLS // 4))
         self.data = []
 
     def render(self):
+        self.win.erase()
+        y = 4
+        max = len(self.data)
+        if max > 40:
+            max = 40
+        self.win.addstr(1, 1, f'{self.data[0]['name']}')
+        self.win.addstr(2, 1, f'{self.data[0]['total_tracks']}')
+        self.win.addstr(3, 1, f'{'-' * (curses.COLS - (curses.COLS // 4))}')
+        for i in range(1, max):
+            self.win.addstr(y, 1, str(self.data[i]))
+            y += 1
         self.win.border()
-        self.win.addstr(1, 1, 'User Playlists Window')
         self.win.refresh()
+
+    def traverse(self):
+        highlight = 1
+        max = len(self.data)
+        if max > 40:
+            max = 40
+
+        while True:
+            self.win.erase()
+            self.render()
+            self.win.border()
+            self.win.refresh()
+            for i in range(1, max):
+                if i == highlight:
+                    self.win.addstr((i + 3), 1, str(self.data[i]), curses.A_REVERSE)
+                else:
+                    self.win.addstr((i + 3), 1, str(self.data[i]))
+
+            key = self.win.getch()
+            if key == 10:
+                # Handle 'Return'
+                self.render()
+                return Message('play_playlist', {'id': self.data[0]['id'], 'offset': highlight - 1})
+            elif key == 27:
+                # Handle 'ESC'
+                self.render()
+                return Message('esc', None)
+            elif key == curses.KEY_UP or chr(key) == 'k':
+                if highlight != 0:
+                    highlight -= 1
+            elif key == curses.KEY_DOWN or chr(key) == 'j':
+                if highlight != len(self.data):
+                    highlight += 1
+            elif chr(key) == 'w':
+                self.render()
+                return Message('next_page', None)
+            elif chr(key) == 'b':
+                self.render()
+                return Message('prev_page', None)
+
+
+class LibraryWin():
+    def __init__(self):
+        self.win = curses.newwin((curses.LINES - 4), (curses.COLS // 4), 0, 0)
+        self.data = []
+        self.filters = ['track', 'album', 'artist', 'playlist']
+
+    def render(self):
+        max = len(self.data)
+        if max > 40:
+            max = 40
+        self.win.erase()
+        y = 3
+        self.win.addstr(1, 1, '\U0001F56E  Your Library')
+        self.win.addstr(2, 1, f'{'-' * (curses.COLS // 4)}')
+        for i in range(0, max):
+            self.win.addstr(y, 1, str(self.data[i]))
+            y += 1
+        self.win.border()
+        self.win.refresh()
+
+    def traverse(self):
+        highlight = 0
+        max = len(self.data)
+        if max > 40:
+            max = 40
+
+        while True:
+            self.win.erase()
+            self.win.addstr(1, 1, '\U0001F56E  Your Library')
+            self.win.addstr(2, 1, f'{'-' * (curses.COLS // 4)}')
+            self.win.border()
+            self.win.refresh()
+            for i in range(max):
+                if i == highlight:
+                    self.win.addstr((i + 3), 1, str(self.data[i]), curses.A_REVERSE)
+                else:
+                    self.win.addstr((i + 3), 1, str(self.data[i]))
+
+            key = self.win.getch()
+            if key == 10:
+                # Handle 'Return'
+                self.render()
+                type = self.data[highlight].type
+                if type == 'track':
+                    return Message('track', self.data[highlight].id)
+                elif type == 'artist':
+                    return Message('artist', self.data[highlight].id)
+                elif type == 'album':
+                    return Message('album', self.data[highlight].id)
+                elif type == 'playlist':
+                    return Message('playlist', self.data[highlight].id)
+            elif key == 27:
+                # Handle 'ESC'
+                self.render()
+                return Message('esc', None)
+            elif key == curses.KEY_UP or chr(key) == 'k':
+                if highlight != 0:
+                    highlight -= 1
+            elif key == curses.KEY_DOWN or chr(key) == 'j':
+                if highlight != len(self.data):
+                    highlight += 1
+            elif chr(key) == 'w':
+                self.render()
+                return Message('next_page', None)
+            elif chr(key) == 'b':
+                self.render()
+                return Message('prev_page', None)
 
 
 class TimelineWin():

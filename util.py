@@ -67,6 +67,18 @@ class Album():
         return f'{self.name} by {self.artists} {self.release_date}'
 
 
+class Playlist():
+    def __init__(self, id, name, owner_name, total_tracks):
+        self.id = id
+        self.name = name
+        self.owner_name = owner_name
+        self.total_tracks = total_tracks
+        self.type = 'playlist'
+
+    def __str__(self):
+        return f'{self.name} by {self.owner_name}'
+
+
 def read_config():
     """
     Reads client_id and client_secret from the config file
@@ -96,6 +108,12 @@ def format_as_search_result(raw_data: dict) -> list:
                           track['id'],
                           track['name'],
                           track['track_number']))
+
+    for playlist in raw_data['playlists']['items']:
+        data.append(Playlist(playlist['id'],
+                             playlist['name'],
+                             playlist['owner']['display_name'],
+                             playlist['tracks']['total']))
 
     for artist in raw_data['artists']['items']:
         data.append(Artist(artist['id'],
@@ -153,6 +171,59 @@ def format_album(album: dict, tracks: list) -> list:
                           track['id'],
                           track['name'],
                           track['track_number']))
+
+    return data
+
+
+def format_playlist(playlist: dict, tracks: list) -> list:
+    data = []
+
+    data.append({'name': playlist['name'], 'total_tracks': playlist['tracks']['total'], 'id': playlist['id']})
+
+    for track in tracks['items']:
+        data.append(Track(track['track']['album']['name'],
+                          track['track']['artists'][0]['name'],
+                          track['track']['disc_number'],
+                          track['track']['duration_ms'],
+                          track['track']['id'],
+                          track['track']['name'],
+                          track['track']['track_number']))
+
+    return data
+
+
+def format_users_library(user: dict, playlists: dict, albums: dict, artists: dict, tracks: dict) -> list:
+    data = []
+
+    for track in tracks['items']:
+        data.append(Track(track['track']['album']['name'],
+                          track['track']['artists'][0]['name'],
+                          track['track']['disc_number'],
+                          track['track']['duration_ms'],
+                          track['track']['id'],
+                          track['track']['name'],
+                          track['track']['track_number']))
+
+    for playlist in playlists['items']:
+        data.append(Playlist(playlist['id'],
+                             playlist['name'],
+                             playlist['owner']['display_name'],
+                             playlist['tracks']['total']))
+
+    for artist in artists['artists']['items']:
+        data.append(Artist(artist['id'],
+                           artist['name'],
+                           artist['popularity'],
+                           artist['followers']['total'],
+                           artist['genres']))
+
+    for album in albums['items']:
+        data.append(Album(album['album']['album_type'],
+                          album['album']['artists'][0]['name'],
+                          album['album']['id'],
+                          album['album']['name'],
+                          album['album']['release_date'],
+                          album['album']['total_tracks']))
 
     return data
 
