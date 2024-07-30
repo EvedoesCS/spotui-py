@@ -33,27 +33,28 @@ config = read_config()
 client_id = config['client_id']
 client_secret = config['client_secret']
 redirect_uri = 'http://localhost:8080'
-scope = 'user-read-private user-read-email user-modify-playback-state user-read-playback-state'
+scope = 'user-library-read user-follow-read user-read-private user-read-email user-modify-playback-state user-read-playback-state'
 url = 'https://accounts.spotify.com/authorize'
 code_verifier, code_challenge = pkce.generate_pkce_pair(43)
 
 
-def store_token(token: str):
+def store_tokens(tokens: str):
     file = open('data.txt', 'w')
-    file.write(token)
+    file.write(tokens)
     file.close()
 
 
-def read_token():
+def retrieve_tokens():
     try:
         file = open('data.txt', 'r')
     except FileNotFoundError:
         file = open('data.txt', 'x')
-        set_token(get_access_code())
+        get_token(get_access_code())
 
-    token = file.read()
+    data = file.readline()
+    tokens = data.split(':')
     file.close()
-    return token
+    return tokens
 
 
 def get_access_code():
@@ -78,7 +79,7 @@ def get_access_code():
     return path[0][1]
 
 
-def set_token(code):
+def get_token(code):
     """ Sets the enviroment variable 'spotui_token' equal to token retrieved
         from the /api/token endpoint """
 
@@ -95,32 +96,43 @@ def set_token(code):
             }
 
     r = requests.post('https://accounts.spotify.com/api/token', data=data, headers=headers)
-    token = json.loads(r.content)['access_token']
-    store_token(token)
+    tokens = json.loads(r.content)
+    access_token = tokens['access_token']
+    refresh_token = tokens['refresh_token']
+    store_tokens(f'{access_token}:{refresh_token}')
 
 
-def refresh_token(access_token):
+def renew_token(refresh_token):
     headers = {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': base64.b64encode(f"{client_id}:{client_secret}".encode())
             }
 
     data = {
             'grant_type': 'refresh_token',
-            'refresh_token': access_token,
+            'refresh_token': refresh_token,
             'client_id': client_id
             }
 
     r = requests.post('https://accounts.spotify.com/api/token', data=data, headers=headers)
-    token = json.loads(r.content)['access_token']
-    store_token(token)
+    if r.status_code == 200:
+        tokens = json.loads(r.content)
+        access_token = tokens['access_token']
+        refresh_token = tokens['refresh_token']
+
+        store_tokens(f'{access_token}:{refresh_token}')
+        return access_token
+
+    else:
+        return r.status_code
 
 
 def authenticate():
-    token = read_token()
-    r = routes.get_users_profile(token)
-    if r == 401:
-        refresh_token(token)
-    token = read_token()
+    tokens = retrieve_tokens()
+    access_token = tokens[0]
+    refresh_token = tokens[1]
 
-    return token
+    r = routes.get_users_profile(access_token)
+    if r == 401:
+        tokens = renew_token(refresh_token)
+
+    return tokens[0]

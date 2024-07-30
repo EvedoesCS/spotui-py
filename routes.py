@@ -11,7 +11,7 @@ config = read_config()
 client_id, client_secret = config['client_id'], config['client_secret']
 
 
-def get_users_profile(token: str) -> int:
+def get_users_profile(token: str) -> dict:
     headers = {
             'Authorization': f"Bearer {token}",
             }
@@ -19,7 +19,66 @@ def get_users_profile(token: str) -> int:
     url = 'https://api.spotify.com/v1/me'
 
     r = requests.get(url, headers=headers)
-    return r.status_code
+    if r.status_code == 200:
+        return json.loads(r.content)
+    else:
+        return r.status_code
+
+
+def get_users_saved_playlists(token: str) -> dict:
+    headers = {
+            'Authorization': f"Bearer {token}",
+            }
+
+    url = 'https://api.spotify.com/v1/me/playlists'
+
+    r = requests.get(url, headers=headers)
+    if r.status_code == 200:
+        return json.loads(r.content)
+    else:
+        return r.status_code
+
+
+def get_users_saved_albums(token: str) -> dict:
+    headers = {
+            'Authorization': f"Bearer {token}",
+            }
+
+    url = 'https://api.spotify.com/v1/me/albums'
+
+    r = requests.get(url, headers=headers)
+    if r.status_code == 200:
+        return json.loads(r.content)
+    else:
+        return r.status_code
+
+
+def get_users_saved_artists(token: str) -> dict:
+    headers = {
+            'Authorization': f"Bearer {token}",
+            }
+
+    url = 'https://api.spotify.com/v1/me/following?type=artist'
+
+    r = requests.get(url, headers=headers)
+    if r.status_code == 200:
+        return json.loads(r.content)
+    else:
+        return r.status_code
+
+
+def get_users_saved_tracks(token: str) -> dict:
+    headers = {
+            'Authorization': f"Bearer {token}",
+            }
+
+    url = 'https://api.spotify.com/v1/me/tracks'
+
+    r = requests.get(url, headers=headers)
+    if r.status_code == 200:
+        return json.loads(r.content)
+    else:
+        return r.status_code
 
 
 def search(token: str, query: str) -> dict:
@@ -29,7 +88,7 @@ def search(token: str, query: str) -> dict:
 
     data = {
             'q': query,
-            'type': 'album,artist,track'
+            'type': 'album,artist,track,playlist'
             }
 
     endpoint = 'https://api.spotify.com/v1/search'
@@ -96,6 +155,27 @@ def play_album(token: str, id, offset: int) -> int:
 
     data = {
             'context_uri': f'spotify:album:{id}',
+            'offset': {
+                'position': offset
+                },
+            'position_ms': 0
+            }
+
+    url = 'https://api.spotify.com/v1/me/player/play'
+
+    r = requests.put(url, headers=headers, data=json.dumps(data))
+    return r.status_code
+
+
+def play_playlist(token: str, id, offset: int) -> int:
+    headers = {
+            'device_id': get_devices(token)['devices'][0]['id'],
+            'Authorization': f"Bearer {token}",
+            'Content-Type': 'application/json'
+            }
+
+    data = {
+            'context_uri': f'spotify:playlist:{id}',
             'offset': {
                 'position': offset
                 },
@@ -284,6 +364,34 @@ def get_album_tracks(token: str, id: str) -> dict:
             }
 
     url = f'https://api.spotify.com/v1/albums/{id}/tracks'
+
+    r = requests.get(url, headers=headers)
+    if r.status_code == 200:
+        return json.loads(r.content)
+    else:
+        return r.status_code
+
+
+def get_playlist(token: str, id: str) -> dict:
+    headers = {
+            'Authorization': f"Bearer {token}"
+            }
+
+    url = f'https://api.spotify.com/v1/playlists/{id}'
+
+    r = requests.get(url, headers=headers)
+    if r.status_code == 200:
+        return json.loads(r.content)
+    else:
+        return r.status_code
+
+
+def get_playlist_tracks(token: str, id: str) -> dict:
+    headers = {
+            'Authorization': f"Bearer {token}"
+            }
+
+    url = f'https://api.spotify.com/v1/playlists/{id}/tracks'
 
     r = requests.get(url, headers=headers)
     if r.status_code == 200:
