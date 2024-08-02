@@ -6,6 +6,7 @@
 import curses
 import util
 from util import Message
+from math import ceil
 
 
 class SearchBarWin():
@@ -63,18 +64,21 @@ class SearchWindow():
     def __init__(self):
         self.win = curses.newwin((curses.LINES - 7), (curses.COLS - (curses.COLS // 4)), 3, (curses.COLS // 4))
         self.data = []
+        self.max = curses.LINES - 14
+        self.current_page = 0
         self.query_phrase = ""
 
     def render(self):
         self.win.erase()
         y = 4
-        max = len(self.data)
-        if max > 40:
-            max = 40
-        self.win.addstr(1, 1, f'Showing search results for "{self.query_phrase}"')
+        start = self.max * self.current_page
+        stop = start + self.max
+        if len(self.data) - start < self.max:
+            stop = start + (len(self.data) - start)
+        self.win.addstr(1, 1, f'Showing search results for "{self.query_phrase}" Page:{self.current_page + 1}/{ceil(len(self.data) / self.max)}')
         self.win.addstr(2, 1, f'{'-' * (curses.COLS - (curses.COLS // 4))}')
         self.win.addstr(3, 1, f'{'title'}')
-        for i in range(max):
+        for i in range(start, stop):
             self.win.addstr(y, 1, str(self.data[i]))
             y += 1
         self.win.border()
@@ -82,49 +86,43 @@ class SearchWindow():
 
     def traverse(self):
         highlight = 0
-        max = len(self.data)
-        if max > 40:
-            max = 40
 
         while True:
             self.win.erase()
-            self.win.addstr(1, 1, f'Showing search results for "{self.query_phrase}"')
+            self.win.addstr(1, 1, f'Showing search results for "{self.query_phrase}" Page:{self.current_page + 1}/{ceil(len(self.data) / self.max)}')
             self.win.addstr(3, 1, f'{'title'}')
             self.win.addstr(2, 1, f'{'-' * (curses.COLS - (curses.COLS // 4))}')
             self.win.border()
             self.win.refresh()
-            for i in range(max):
-                if i == highlight:
-                    self.win.addstr((i + 4), 1, str(self.data[i]), curses.A_REVERSE)
+            y = 4
+            start = self.max * self.current_page
+            stop = start + self.max
+            if len(self.data) - start < self.max:
+                stop = start + (len(self.data) - start)
+            for i in range(start, stop):
+                if (i - start) == highlight:
+                    self.win.addstr(y, 1, str(self.data[i]), curses.A_REVERSE)
+                    y += 1
                 else:
-                    self.win.addstr((i + 4), 1, str(self.data[i]))
+                    self.win.addstr(y, 1, str(self.data[i]))
+                    y += 1
 
             key = self.win.getch()
             if key == 10:
                 # Handle 'Return'
-                self.win.erase()
-                self.win.addstr(1, 1, f'Showing search results for "{self.query_phrase}"')
-                self.win.addstr(3, 1, f'{'title'}')
-                self.win.addstr(2, 1, f'{'-' * (curses.COLS - (curses.COLS // 4))}')
-                self.win.border()
-                self.win.refresh()
-                type = self.data[highlight].type
+                self.render()
+                type = self.data[highlight + start].type
                 if type == 'track':
-                    return Message('track', self.data[highlight].id)
+                    return Message('track', self.data[highlight + start].id)
                 elif type == 'artist':
-                    return Message('artist', self.data[highlight].id)
+                    return Message('artist', self.data[highlight + start].id)
                 elif type == 'album':
-                    return Message('album', self.data[highlight].id)
+                    return Message('album', self.data[highlight + start].id)
                 elif type == 'playlist':
-                    return Message('playlist', self.data[highlight].id)
+                    return Message('playlist', self.data[highlight + start].id)
             elif key == 27:
                 # Handle 'ESC'
-                self.win.erase()
-                self.win.addstr(1, 1, f'Showing search results for "{self.query_phrase}"')
-                self.win.addstr(3, 1, f'{'title'}')
-                self.win.addstr(2, 1, f'{'-' * (curses.COLS - (curses.COLS // 4))}')
-                self.win.border()
-                self.win.refresh()
+                self.render()
                 return Message('esc', None)
             elif key == curses.KEY_UP or chr(key) == 'k':
                 if highlight != 0:
@@ -132,6 +130,12 @@ class SearchWindow():
             elif key == curses.KEY_DOWN or chr(key) == 'j':
                 if highlight != len(self.data):
                     highlight += 1
+            elif key == curses.KEY_LEFT or chr(key) == 'h':
+                if self.current_page > 0:
+                    self.current_page -= 1
+            elif key == curses.KEY_RIGHT or chr(key) == 'l':
+                if self.current_page < ceil(len(self.data) / self.max):
+                    self.current_page += 1
             elif chr(key) == 'w':
                 self.render()
                 return Message('next_page', None)
