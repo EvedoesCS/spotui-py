@@ -29,8 +29,7 @@ def get_users_saved_playlists(token: str) -> dict:
     headers = {
             'Authorization': f"Bearer {token}",
             }
-
-    url = 'https://api.spotify.com/v1/me/playlists'
+    url = 'https://api.spotify.com/v1/me/playlists?limit=50'
 
     r = requests.get(url, headers=headers)
     if r.status_code == 200:
@@ -44,7 +43,7 @@ def get_users_saved_albums(token: str) -> dict:
             'Authorization': f"Bearer {token}",
             }
 
-    url = 'https://api.spotify.com/v1/me/albums'
+    url = 'https://api.spotify.com/v1/me/albums?limit=50'
 
     r = requests.get(url, headers=headers)
     if r.status_code == 200:
@@ -58,7 +57,7 @@ def get_users_saved_artists(token: str) -> dict:
             'Authorization': f"Bearer {token}",
             }
 
-    url = 'https://api.spotify.com/v1/me/following?type=artist'
+    url = 'https://api.spotify.com/v1/me/following?type=artist&limit=50'
 
     r = requests.get(url, headers=headers)
     if r.status_code == 200:
@@ -72,7 +71,7 @@ def get_users_saved_tracks(token: str) -> dict:
             'Authorization': f"Bearer {token}",
             }
 
-    url = 'https://api.spotify.com/v1/me/tracks'
+    url = 'https://api.spotify.com/v1/me/tracks?limit=50'
 
     r = requests.get(url, headers=headers)
     if r.status_code == 200:

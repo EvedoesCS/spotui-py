@@ -33,7 +33,7 @@ config = read_config()
 client_id = config['client_id']
 client_secret = config['client_secret']
 redirect_uri = 'http://localhost:8080'
-scope = 'user-library-read user-follow-read user-read-private user-read-email user-modify-playback-state user-read-playback-state'
+scope = 'user-library-read user-follow-read user-read-private playlist-read-private user-read-email user-modify-playback-state user-read-playback-state'
 url = 'https://accounts.spotify.com/authorize'
 code_verifier, code_challenge = pkce.generate_pkce_pair(43)
 
@@ -47,14 +47,20 @@ def store_tokens(tokens: str):
 def retrieve_tokens():
     try:
         file = open('data.txt', 'r')
+        data = file.read()
+        file.close()
+
+        tokens = data.split(':')
+        return tokens
     except FileNotFoundError:
         file = open('data.txt', 'x')
-        get_token(get_access_code())
+        file.close()
 
-    data = file.readline()
-    tokens = data.split(':')
-    file.close()
-    return tokens
+        tokens = get_token(get_access_code())
+        file = open('data.txt', 'w')
+        file.write(tokens)
+        file.close()
+        return tokens
 
 
 def get_access_code():
@@ -99,7 +105,8 @@ def get_token(code):
     tokens = json.loads(r.content)
     access_token = tokens['access_token']
     refresh_token = tokens['refresh_token']
-    store_tokens(f'{access_token}:{refresh_token}')
+
+    return f'{access_token}:{refresh_token}'
 
 
 def renew_token(refresh_token):
@@ -119,8 +126,7 @@ def renew_token(refresh_token):
         access_token = tokens['access_token']
         refresh_token = tokens['refresh_token']
 
-        store_tokens(f'{access_token}:{refresh_token}')
-        return access_token
+        return f'{access_token}:{refresh_token}'
 
     else:
         return r.status_code
@@ -133,6 +139,10 @@ def authenticate():
 
     r = routes.get_users_profile(access_token)
     if r == 401:
+        tokens = retrieve_tokens()
+        access_token = tokens[0]
+        refresh_token = tokens[1]
         tokens = renew_token(refresh_token)
+        store_tokens(tokens)
 
-    return tokens[0]
+    return access_token

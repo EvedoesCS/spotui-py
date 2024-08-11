@@ -109,12 +109,6 @@ def format_as_search_result(raw_data: dict) -> list:
                           track['name'],
                           track['track_number']))
 
-    for playlist in raw_data['playlists']['items']:
-        data.append(Playlist(playlist['id'],
-                             playlist['name'],
-                             playlist['owner']['display_name'],
-                             playlist['tracks']['total']))
-
     for artist in raw_data['artists']['items']:
         data.append(Artist(artist['id'],
                            artist['name'],
@@ -129,6 +123,12 @@ def format_as_search_result(raw_data: dict) -> list:
                           album['name'],
                           album['release_date'],
                           album['total_tracks']))
+
+    for playlist in raw_data['playlists']['items']:
+        data.append(Playlist(playlist['id'],
+                             playlist['name'],
+                             playlist['owner']['display_name'],
+                             playlist['tracks']['total']))
 
     return data
 
@@ -195,35 +195,39 @@ def format_playlist(playlist: dict, tracks: list) -> list:
 def format_users_library(user: dict, playlists: dict, albums: dict, artists: dict, tracks: dict) -> list:
     data = []
 
-    for track in tracks['items']:
-        data.append(Track(track['track']['album']['name'],
-                          track['track']['artists'][0]['name'],
-                          track['track']['disc_number'],
-                          track['track']['duration_ms'],
-                          track['track']['id'],
-                          track['track']['name'],
-                          track['track']['track_number']))
+    if type(tracks) is not int:
+        for track in tracks['items']:
+            data.append(Track(track['track']['album']['name'],
+                              track['track']['artists'][0]['name'],
+                              track['track']['disc_number'],
+                              track['track']['duration_ms'],
+                              track['track']['id'],
+                              track['track']['name'],
+                              track['track']['track_number']))
 
-    for playlist in playlists['items']:
-        data.append(Playlist(playlist['id'],
-                             playlist['name'],
-                             playlist['owner']['display_name'],
-                             playlist['tracks']['total']))
+    if type(playlists) is not int:
+        for playlist in playlists['items']:
+            data.append(Playlist(playlist['id'],
+                                 playlist['name'],
+                                 playlist['owner']['display_name'],
+                                 playlist['tracks']['total']))
 
-    for artist in artists['artists']['items']:
-        data.append(Artist(artist['id'],
-                           artist['name'],
-                           artist['popularity'],
-                           artist['followers']['total'],
-                           artist['genres']))
+    if type(artists) is not int:
+        for artist in artists['artists']['items']:
+            data.append(Artist(artist['id'],
+                               artist['name'],
+                               artist['popularity'],
+                               artist['followers']['total'],
+                               artist['genres']))
 
-    for album in albums['items']:
-        data.append(Album(album['album']['album_type'],
-                          album['album']['artists'][0]['name'],
-                          album['album']['id'],
-                          album['album']['name'],
-                          album['album']['release_date'],
-                          album['album']['total_tracks']))
+    if type(albums) is not int:
+        for album in albums['items']:
+            data.append(Album(album['album']['album_type'],
+                              album['album']['artists'][0]['name'],
+                              album['album']['id'],
+                              album['album']['name'],
+                              album['album']['release_date'],
+                              album['album']['total_tracks']))
 
     return data
 

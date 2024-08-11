@@ -8,6 +8,7 @@ import threading
 import curses
 from curses import wrapper
 from time import sleep
+import signal
 
 import auth
 import routes
@@ -20,19 +21,29 @@ class App():
     def __init__(self, win):
         self.win = win
         self.token = auth.authenticate()
+        self.setupSignalHandler()
         self.message_queue = Queue()
+        self.y, self.x = self.win.getmaxyx()
         self.history = [{
-                'search_bar': ui.SearchBarWin(),
-                'content_window': ui.ContentWin(),
-                'library_window': ui.LibraryWin(),
-                'timeline_bar': ui.TimelineWin()
+                'search_bar': ui.SearchBarWin(self.y, self.x),
+                'content_window': ui.ContentWin(self.y, self.x),
+                'library_window': ui.LibraryWin(self.y, self.x),
+                'timeline_bar': ui.TimelineWin(self.y, self.x)
                 }]
         self.history_index = 0
+        self.exiting = False
 
-        # Application State Variables
+        # Application State Variable
         self.runtime = 0
         self.focused = False
         self.playback_state = routes.get_playback_state(self.token)
+
+    def setupSignalHandler(self):
+        signal.signal(signal.SIGWINCH, self.handle_resize)
+
+    def handle_resize(self, signum, frame):
+        self.exiting = True
+        self.message_queue.enqueue(Message('exit', None))
 
     # T1 Methods
 
@@ -40,7 +51,7 @@ class App():
         self.win.nodelay(True)
         new_message = Message(None, None)
         # Iterates over event sites and checks for unhandled events
-        while new_message.header != 'exit':
+        while new_message.header != 'exit' and self.exiting is not True:
             sleep(0.33)
             self.runtime += 0.33
             if self.runtime >= 1800:
@@ -55,16 +66,21 @@ class App():
                     if new_message.header != 'err':
                         self.message_queue.enqueue(new_message)
 
-        routes.pause(self.token)
+        self.message_queue.enqueue(Message('exit', None))
 
     def handle_key(self, key):
         # Handler assembles and returns message objects based on key events
         if chr(key) == 'q':
+            global restart
+            restart = False
             return Message('exit', None)
         elif chr(key) == 's':
             return Message('search', None)
         elif chr(key) == 'c':
-            return Message('traverse', self.find_traversable())
+            if 'content_window' not in self.history[self.history_index].keys():
+                return Message('traverse', self.find_traversable())
+            else:
+                return Message('err', None)
         elif chr(key) == 'p':
             if self.playback_state['is_playing'] == True:
                 return Message('pause', None)
@@ -203,8 +219,11 @@ class App():
     # Main Methods
 
     def handle_msg(self, message: Message):
+        if message.header == 'exit':
+            return Message('err', None)
+
         # Keybind Related Messages
-        if message.header == 'search':
+        elif message.header == 'search':
             r = self.search()
             if r[0] == 'esc':
                 return Message('esc', None)
@@ -233,7 +252,8 @@ class App():
         elif message.header == 'load_prev_history':
             if self.history_index != 0:
                 self.history_index -= 1
-            self.message_queue.enqueue(Message('traverse', self.find_traversable()))
+            if self.history_index != 0:
+                self.message_queue.enqueue(Message('traverse', self.find_traversable()))
             return Message('history_updated', None)
 
         # Route Related Messages
@@ -282,12 +302,13 @@ class App():
         self.history_index += 1
 
     def build_model(self, data):
+        y, x = self.win.getmaxyx()
         if data.header == 'search_window':
             components = {
-                    'search_bar': ui.SearchBarWin(),
-                    'search_window': ui.SearchWindow(),
+                    'search_bar': ui.SearchBarWin(y, x),
+                    'search_window': ui.SearchWindow(y, x),
                     'library_window': self.history[self.history_index]['library_window'],
-                    'timeline_bar': ui.TimelineWin()
+                    'timeline_bar': ui.TimelineWin(y, x)
                     }
             self.add_to_history(components)
             self.history[self.history_index]['search_window'].data = util.format_as_search_result(data.body[1])
@@ -304,10 +325,10 @@ class App():
 
         elif data.header == 'artist_window':
             components = {
-                    'search_bar': ui.SearchBarWin(),
-                    'artist_window': ui.ArtistWin(),
+                    'search_bar': ui.SearchBarWin(y, x),
+                    'artist_window': ui.ArtistWin(y, x),
                     'library_window': self.history[self.history_index]['library_window'],
-                    'timeline_bar': ui.TimelineWin()
+                    'timeline_bar': ui.TimelineWin(y, x)
                     }
             self.add_to_history(components)
             self.history[self.history_index]['artist_window'].data = data.body
@@ -317,10 +338,10 @@ class App():
 
         elif data.header == 'album_window':
             components = {
-                    'search_bar': ui.SearchBarWin(),
-                    'album_window': ui.AlbumWin(),
+                    'search_bar': ui.SearchBarWin(y, x),
+                    'album_window': ui.AlbumWin(y, x),
                     'library_window': self.history[self.history_index]['library_window'],
-                    'timeline_bar': ui.TimelineWin()
+                    'timeline_bar': ui.TimelineWin(y, x)
                     }
             self.add_to_history(components)
             self.history[self.history_index]['album_window'].data = data.body
@@ -330,10 +351,10 @@ class App():
 
         elif data.header == 'playlist_window':
             components = {
-                    'search_bar': ui.SearchBarWin(),
-                    'playlist_window': ui.PlaylistWin(),
+                    'search_bar': ui.SearchBarWin(y, x),
+                    'playlist_window': ui.PlaylistWin(y, x),
                     'library_window': self.history[self.history_index]['library_window'],
-                    'timeline_bar': ui.TimelineWin()
+                    'timeline_bar': ui.TimelineWin(y, x)
                     }
             self.add_to_history(components)
             self.history[self.history_index]['playlist_window'].data = data.body
@@ -385,6 +406,8 @@ def main(win):
     app.run()
 
 
+restart = True
 if __name__ == "__main__":
-    win = curses.initscr()
-    wrapper(main)
+    while restart is True:
+        win = curses.initscr()
+        wrapper(main)
