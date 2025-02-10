@@ -38,7 +38,7 @@ url = 'https://accounts.spotify.com/authorize'
 code_verifier, code_challenge = pkce.generate_pkce_pair(43)
 
 
-def store_tokens(tokens: str):
+def store_tokens(tokens):
     file = open('data.txt', 'w')
     file.write(tokens)
     file.close()
